@@ -5,4 +5,3 @@ def draw_box():
     print('*' * 10)
 
 draw_box()
-print('eee')
