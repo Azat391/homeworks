@@ -66,6 +66,7 @@ def update_booking(get_token,create_booking):
     timeout=10)
     response.raise_for_status()
     yield response
+
 @pytest.fixture
 def get_my_update_booker(update_booking, create_booking):
     created=create_booking.json()

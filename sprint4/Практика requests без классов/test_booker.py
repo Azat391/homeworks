@@ -1,5 +1,15 @@
 import requests, pytest
-
+booker={
+    'firstname': 'Pal',
+    'lastname': 'Laich',
+    'totalprice': 69,
+    'depositpaid': True,
+    'bookingdates': {
+        'checkin': '2027-08-10',
+        'checkout': '2027-08-15',
+    },
+    'additionalneeds': 'Движуха',
+}
 base_url='https://restful-booker.herokuapp.com'
 class TestBookingsIds:
     def test_status_code(self, get_booking):
@@ -56,31 +66,31 @@ class TestDelete:
     def test_delete(self, delete_booking):
         assert delete_booking.status_code==201
 
-# @pytest.mark.parametrize(
-#     "patch_payload, changed_field, expected",
-#     [
-#         ({'firstname': 'Maria'}, 'firstname', 'Maria'),
-#         ({'totalprice': 777}, 'totalprice', 777),
-#         ({'depositpaid': False}, 'depositpaid', False),
-#     ],
-# )
-# def test_param(patch_payload, changed_field,create_booking, get_token, update_booking, expected):
-#     created=create_booking.json()
-#     booking_id=created['bookingid']
-#     original=(requests.get(f'{base_url}/booking/{booking_id}', timeout=10,
-#     headers = {'Content-Type': 'application/json'})).json()
-#     response_patch=requests.patch(f'{base_url}/booking/{booking_id}',
-#     json= 
-#     patch_payload
-# ,
-#     cookies={'token': get_token},
-#     headers={'Accept': 'application/json'},
-#     timeout=10)
-#     patched=(requests.get(f'{base_url}/booking/{booking_id}', timeout=10,
-#     headers = {'Content-Type': 'application/json'})).json()
-#     assert response_patch==patched
-#     response_delete=requests.delete(f'{base_url}/booking/{booking_id}',
-#     cookies={'token': get_token},
-#     headers={'Accept': 'application/json'},
-#     timeout=10)
-#     assert response_delete.status_code==201
+@pytest.mark.parametrize(
+    "patch_payload, changed_field, expected",
+    [
+        ({'firstname': 'Maria'}, 'firstname', 'Maria'),
+        ({'totalprice': 777}, 'totalprice', 777),
+        ({'depositpaid': False}, 'depositpaid', False),
+    ],
+)
+def test_param(patch_payload, changed_field,create_booking, get_token, expected):
+    created=create_booking.json()
+    booking_id=created['bookingid']
+    requests.get(f'{base_url}/booking/{booking_id}', timeout=10,
+    headers = {'Content-Type': 'application/json'}).json()
+    response_patch=requests.patch(f'{base_url}/booking/{booking_id}',
+    json=patch_payload,
+    cookies={'token': get_token},
+    headers={'Accept': 'application/json'},
+    timeout=10)
+    patched=(requests.get(f'{base_url}/booking/{booking_id}', timeout=10,
+    headers = {'Content-Type': 'application/json'})).json()
+    assert patched[changed_field]==expected
+    assert response_patch.status_code == 200
+    assert patched==response_patch.json()
+    response_delete=requests.delete(f'{base_url}/booking/{booking_id}',
+    cookies={'token': get_token},
+    headers={'Accept': 'application/json'},
+    timeout=10)
+    assert response_delete.status_code==201
