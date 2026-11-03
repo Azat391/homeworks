@@ -1,0 +1,13 @@
+from pages.book_page import BookPage
+
+
+class BookCard:
+    def __init__(self, page, card):
+        self.page = page
+        self.card = card
+
+    def open_book(self):
+        link = self.card.locator('a[data-testid="art__title"]')
+        link.evaluate("el => el.removeAttribute('target')")
+        link.click()
+        return BookPage(self.page)
