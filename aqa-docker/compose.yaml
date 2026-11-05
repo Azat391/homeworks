@@ -1,0 +1,35 @@
+services:
+  api:
+    image: python:3.12.14-slim-bookworm
+    working_dir: /service
+    command: ["python", "server.py"]
+    volumes:
+      - ./mock_api:/service:ro
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/ping', timeout=2)"
+      interval: 2s
+      timeout: 3s
+      retries: 15
+
+  tests:
+    build: .
+    command:
+      - python
+      - -m
+      - pytest
+      - -m
+      - ${PYTEST_MARKER:-api}
+      - -q
+      - --alluredir=allure-results
+    environment:
+      BASE_URL: http://api:8000
+      API_TOKEN: ${API_TOKEN:-}
+    depends_on:
+      api:
+        condition: service_healthy
+    volumes:
+      - ./allure-results:/app/allure-results
