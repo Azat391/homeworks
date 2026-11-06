@@ -1,113 +1,35 @@
-pipeline {
-    agent any
+services:
+  api:
+    image: python:3.12.14-slim-bookworm
+    working_dir: /service
+    command: ["python", "server.py"]
+    volumes:
+      - ./mock_api:/service:ro
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/ping', timeout=2)"
+      interval: 2s
+      timeout: 3s
+      retries: 15
 
-    options {
-        skipDefaultCheckout(true)
-        disableConcurrentBuilds()
-        timestamps()
-        buildDiscarder(logRotator(numToKeepStr: '20'))
-    }
-
-    parameters {
-        choice(
-            name: 'TEST_SET',
-            choices: ['smoke', 'api'],
-            description: 'Marker pytest'
-        )
-    }
-
-    stages {
-        stage('Checkout') {
-            steps {
-                deleteDir()
-                checkout scm
-            }
-        }
-
-        stage('Prepare') {
-            steps {
-                script {
-                    def safeJobName = env.JOB_BASE_NAME
-                        .toLowerCase()
-                        .replaceAll('[^a-z0-9_.-]+', '-')
-                        .take(32)
-
-                    env.COMPOSE_PROJECT_NAME =
-                        "aqa-${safeJobName}-${env.BUILD_NUMBER}"
-                }
-
-                dir('aqa-docker') {
-                    sh '''
-                        rm -rf allure-results
-                        mkdir -p allure-results
-                    '''
-                }
-            }
-        }
-
-        stage('Validate') {
-            steps {
-                dir('aqa-docker') {
-                    sh 'docker compose config --quiet'
-                }
-            }
-        }
-
-        stage('Tests') {
-            steps {
-                dir('aqa-docker') {
-                    sh '''
-                        PYTEST_MARKER="$TEST_SET" \
-                        docker compose -p "$COMPOSE_PROJECT_NAME" up \
-                          --build \
-                          --abort-on-container-exit \
-                          --exit-code-from tests
-                    '''
-                }
-            }
-        }
-    }
-
-    post {
-        always {
-            script {
-                def allureResultsExist = 0
-                dir('aqa-docker') {
-                    allureResultsExist = sh(
-                        script: '''
-                            test -d allure-results &&
-                            find allure-results -type f -print -quit | grep -q .
-                        ''',
-                        returnStatus: true
-                    )
-                }
-
-                if (allureResultsExist == 0) {
-                    dir('aqa-docker') {
-                        archiveArtifacts artifacts: 'allure-results/**'
-                        allure results: [[path: 'allure-results']]
-                    }
-                } else {
-                    echo 'Allure results не созданы'
-                    if (currentBuild.currentResult == 'SUCCESS') {
-                        currentBuild.result = 'FAILURE'
-                    }
-                }
-            }
-        }
-
-        cleanup {
-            script {
-                if (env.COMPOSE_PROJECT_NAME?.trim()) {
-                    dir('aqa-docker') {
-                        sh '''
-                            docker compose -p "$COMPOSE_PROJECT_NAME" down \
-                              --remove-orphans \
-                              --rmi local || true
-                        '''
-                    }
-                }
-            }
-        }
-    }
-}
+  tests:
+    build: .
+    command:
+      - python
+      - -m
+      - pytest
+      - -m
+      - ${PYTEST_MARKER:-api}
+      - -q
+      - --alluredir=allure-results
+    environment:
+      BASE_URL: http://api:8000
+      API_TOKEN: ${API_TOKEN:-}
+    depends_on:
+      api:
+        condition: service_healthy
+    volumes:
+      - ./allure-results:/app/allure-results
