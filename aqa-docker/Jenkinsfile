@@ -1,76 +1,17 @@
-pipeline {
-    agent any
-
-    options {
-        skipDefaultCheckout(true)
-        disableConcurrentBuilds()
-        timestamps()
-        buildDiscarder(logRotator(numToKeepStr: '20'))
-    }
-
-    parameters {
-        choice(
-            name: 'TEST_SET',
-            choices: ['smoke', 'api'],
-            description: 'Marker pytest'
-        )
-    }
-
-    stages {
-        stage('Checkout') {
-            steps {
-                deleteDir()
-                checkout scm
-            }
-        }
-
-        stage('Prepare') {
-            steps {
-                script {
-                    def safeJobName = env.JOB_BASE_NAME
-                        .toLowerCase()
-                        .replaceAll('[^a-z0-9_.-]+', '-')
-                        .take(32)
-
-                    env.COMPOSE_PROJECT_NAME =
-                        "aqa-${safeJobName}-${env.BUILD_NUMBER}"
-                }
-
-                dir('aqa-docker') {
-                    sh '''
-                        rm -rf allure-results
-                        mkdir -p allure-results
-                    '''
-                }
-            }
-        }
-
-        stage('Validate') {
-            steps {
-                dir('aqa-docker') {
-                    sh 'docker compose config --quiet'
-                }
-            }
-        }
-
-        stage('Tests') {
-            steps {
-                dir('aqa-docker') {
-                    sh '''
-                        PYTEST_MARKER="$TEST_SET" \
-                        docker compose -p "$COMPOSE_PROJECT_NAME" up \
-                          --build \
-                          --abort-on-container-exit \
-                          --exit-code-from tests
-                    '''
-                }
-            }
-        }
-    }
-
     post {
         always {
             script {
+                // Вытаскиваем результаты Allure из остановленного контейнера
+                dir('aqa-docker') {
+                    sh """
+                        CONTAINER_ID=\$(docker ps -a -q -f name=\${COMPOSE_PROJECT_NAME}-tests-1)
+                        if [ -n "\$CONTAINER_ID" ]; then
+                            docker cp \$CONTAINER_ID:/app/allure-results ./allure-results || true
+                        fi
+                    """
+                }
+
+                // Теперь проверяем, что файлы на месте
                 def allureResultsExist = 0
                 dir('aqa-docker') {
                     allureResultsExist = sh(
@@ -110,4 +51,3 @@ pipeline {
             }
         }
     }
-}
