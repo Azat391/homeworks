@@ -36,28 +36,34 @@ pipeline {
                         "aqa-${safeJobName}-${env.BUILD_NUMBER}"
                 }
 
-                sh '''
-                    rm -rf allure-results
-                    mkdir -p allure-results
-                '''
+                dir('aqa-docker') {
+                    sh '''
+                        rm -rf allure-results
+                        mkdir -p allure-results
+                    '''
+                }
             }
         }
 
         stage('Validate') {
             steps {
-                sh 'docker compose config --quiet'
+                dir('aqa-docker') {
+                    sh 'docker compose config --quiet'
+                }
             }
         }
 
         stage('Tests') {
             steps {
-                sh '''
-                    PYTEST_MARKER="$TEST_SET" \
-                    docker compose -p "$COMPOSE_PROJECT_NAME" up \
-                      --build \
-                      --abort-on-container-exit \
-                      --exit-code-from tests
-                '''
+                dir('aqa-docker') {
+                    sh '''
+                        PYTEST_MARKER="$TEST_SET" \
+                        docker compose -p "$COMPOSE_PROJECT_NAME" up \
+                          --build \
+                          --abort-on-container-exit \
+                          --exit-code-from tests
+                    '''
+                }
             }
         }
     }
@@ -65,17 +71,22 @@ pipeline {
     post {
         always {
             script {
-                def allureResultsExist = sh(
-                    script: '''
-                        test -d allure-results &&
-                        find allure-results -type f -print -quit | grep -q .
-                    ''',
-                    returnStatus: true
-                ) == 0
+                def allureResultsExist = 0
+                dir('aqa-docker') {
+                    allureResultsExist = sh(
+                        script: '''
+                            test -d allure-results &&
+                            find allure-results -type f -print -quit | grep -q .
+                        ''',
+                        returnStatus: true
+                    )
+                }
 
-                if (allureResultsExist) {
-                    archiveArtifacts artifacts: 'allure-results/**'
-                    allure results: [[path: 'allure-results']]
+                if (allureResultsExist == 0) {
+                    dir('aqa-docker') {
+                        archiveArtifacts artifacts: 'allure-results/**'
+                        allure results: [[path: 'allure-results']]
+                    }
                 } else {
                     echo 'Allure results не созданы'
                     if (currentBuild.currentResult == 'SUCCESS') {
@@ -88,11 +99,13 @@ pipeline {
         cleanup {
             script {
                 if (env.COMPOSE_PROJECT_NAME?.trim()) {
-                    sh '''
-                        docker compose -p "$COMPOSE_PROJECT_NAME" down \
-                          --remove-orphans \
-                          --rmi local || true
-                    '''
+                    dir('aqa-docker') {
+                        sh '''
+                            docker compose -p "$COMPOSE_PROJECT_NAME" down \
+                              --remove-orphans \
+                              --rmi local || true
+                        '''
+                    }
                 }
             }
         }
