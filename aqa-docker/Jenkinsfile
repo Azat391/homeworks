@@ -68,7 +68,7 @@ pipeline {
         }
     }
 
-    post {
+        post {
         always {
             script {
                 // Вытаскиваем результаты Allure из остановленного контейнера
@@ -76,7 +76,7 @@ pipeline {
                     sh """
                         CONTAINER_ID=\$(docker ps -a -q -f name=\${COMPOSE_PROJECT_NAME}-tests-1)
                         if [ -n "\$CONTAINER_ID" ]; then
-                            docker cp \$CONTAINER_ID:/app/allure-results ./allure-results || true
+                            docker cp \$CONTAINER_ID:/app/allure-results/. ./allure-results || true
                         fi
                     """
                 }
@@ -121,4 +121,4 @@ pipeline {
             }
         }
     }
-}
+       
