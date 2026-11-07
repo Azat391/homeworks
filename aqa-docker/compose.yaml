@@ -16,7 +16,7 @@ services:
   tests:
     build: .
     command:
-      - python
+      - pytho
       - -m
       - pytest
       - -m
