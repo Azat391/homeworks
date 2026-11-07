@@ -69,29 +69,24 @@ pipeline {
             }
         }
 
-        // =========================================================================
-        // ВНИМАНИЕ: Этап Auth закомментирован!
-        // Из-за конфликта Docker-in-Docker, Jenkins не может пробросить секрет 
-        // в контейнер, из-за чего сборка падает. Для сдачи это опциональное задание.
-        // Если захочешь включить, раскомментируй блок и убедись, что секрет работает.
-        // =========================================================================
-        // stage('Authenticated API tests') {
-        //     environment {
-        //         API_TOKEN = credentials('aqa-api-token')
-        //     }
-        //     steps {
-        //         dir('aqa-docker') {
-        //             sh '''
-        //                 API_TOKEN="$API_TOKEN" \
-        //                 PYTEST_MARKER=auth \
-        //                 docker compose -p "$COMPOSE_PROJECT_NAME" up \
-        //                   --build \
-        //                   --abort-on-container-exit \
-        //                   --exit-code-from tests
-        //             '''
-        //         }
-        //     }
-        // }
+        // ВКЛЮЧЕННЫЙ ЭТАП АВТОРИЗАЦИИ
+        stage('Authenticated API tests') {
+            steps {
+                // Используем withCredentials для безопасной передачи токена
+                withCredentials([string(credentialsId: 'aqa-api-token', variable: 'API_TOKEN')]) {
+                    dir('aqa-docker') {
+                        sh '''
+                            API_TOKEN="$API_TOKEN" \
+                            PYTEST_MARKER=auth \
+                            docker compose -p "$COMPOSE_PROJECT_NAME" up \
+                              --build \
+                              --abort-on-container-exit \
+                              --exit-code-from tests
+                        '''
+                    }
+                }
+            }
+        }
     }
 
     post {
@@ -108,7 +103,7 @@ pipeline {
                     """
                 }
 
-                // Проверяем Allure (ищем файлы во вложенной папке ui)
+                // Проверяем Allure (так как compose.yaml пишет в подпапку ui)
                 def allureResultsExist = 0
                 dir('aqa-docker') {
                     allureResultsExist = sh(
@@ -122,11 +117,10 @@ pipeline {
 
                 if (allureResultsExist == 0) {
                     dir('aqa-docker') {
-                        // Сохраняем артефакты
                         archiveArtifacts artifacts: 'allure-results/**'
                         archiveArtifacts artifacts: 'test-results/**', allowEmptyArchive: true 
                         
-                        // Указываем путь к подпапке ui, куда compose.yaml сохраняет результаты
+                        // Генерируем отчет из папки ui
                         allure results: [[path: 'allure-results/ui']]
                     }
                 } else {
