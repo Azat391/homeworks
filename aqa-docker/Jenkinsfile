@@ -11,7 +11,7 @@ pipeline {
     parameters {
         choice(
             name: 'TEST_SET',
-            choices: ['smoke', 'api', 'regression'],
+            choices: ['smoke', 'api', 'regression'], // Добавлен regression (Задание 10)
             description: 'Marker pytest'
         )
     }
@@ -34,6 +34,9 @@ pipeline {
 
                     env.COMPOSE_PROJECT_NAME =
                         "aqa-${safeJobName}-${env.BUILD_NUMBER}"
+                    
+                    // Выводим в лог для проверки (Задание 9)
+                    echo "Сгенерирован COMPOSE_PROJECT_NAME: ${env.COMPOSE_PROJECT_NAME}"
                 }
 
                 dir('aqa-docker') {
@@ -66,6 +69,25 @@ pipeline {
                 }
             }
         }
+
+        stage('Authenticated API tests') {
+            environment {
+                // Секрет берется из Jenkins Credentials (Задание 11)
+                API_TOKEN = credentials('aqa-api-token')
+            }
+            steps {
+                dir('aqa-docker') {
+                    sh '''
+                        API_TOKEN="$API_TOKEN" \
+                        PYTEST_MARKER=auth \
+                        docker compose -p "$COMPOSE_PROJECT_NAME" up \
+                          --build \
+                          --abort-on-container-exit \
+                          --exit-code-from tests
+                    '''
+                }
+            }
+        }
     }
 
     post {
@@ -81,7 +103,7 @@ pipeline {
                     """
                 }
 
-                // Теперь проверяем, что файлы на месте
+                // Проверяем, что файлы на месте
                 def allureResultsExist = 0
                 dir('aqa-docker') {
                     allureResultsExist = sh(
