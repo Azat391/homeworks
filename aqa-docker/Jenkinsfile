@@ -11,7 +11,7 @@ pipeline {
     parameters {
         choice(
             name: 'TEST_SET',
-            choices: ['smoke', 'api'],
+            choices: ['smoke', 'api', 'regression'],
             description: 'Marker pytest'
         )
     }
