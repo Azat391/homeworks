@@ -68,7 +68,7 @@ pipeline {
         }
     }
 
-        post {
+    post {
         always {
             script {
                 // Вытаскиваем результаты Allure из остановленного контейнера
@@ -121,4 +121,4 @@ pipeline {
             }
         }
     }
-       
+}
