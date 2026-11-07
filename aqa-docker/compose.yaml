@@ -4,17 +4,15 @@ services:
     working_dir: /app
     command: ["python", "mock_api/server.py"]
     healthcheck:
-      test:
-        - CMD
-        - python
-        - -c
-        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/ping', timeout=2)"
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/ping', timeout=2)"]
       interval: 2s
       timeout: 3s
       retries: 15
 
   tests:
     build: .
+    init: true
+    ipc: host
     command:
       - python
       - -m
@@ -22,10 +20,15 @@ services:
       - -m
       - ${PYTEST_MARKER:-api}
       - -q
-      - --alluredir=allure-results
+      - --alluredir=allure-results/ui
+      - --tracing=retain-on-failure
+      - --screenshot=only-on-failure
     environment:
       BASE_URL: http://api:8000
       API_TOKEN: ${API_TOKEN:-}
     depends_on:
       api:
         condition: service_healthy
+    volumes:
+      - ./allure-results:/app/allure-results
+      - ./test-results:/app/test-results
